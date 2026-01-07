@@ -1,0 +1,48 @@
+name: Build APT Repository
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up GPG
+      uses: crazy-max/ghaction-import-gpg@v5
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y dpkg-dev build-essential devscripts fakeroot
+
+    - name: Build .deb package
+      run: |
+        mkdir -p build
+        cp -r jtime/* build/
+        cd build
+        dpkg-deb --build jtime_1.0-1
+        mv jtime_1.0-1.deb ../
+
+    - name: Generate APT metadata
+      run: |
+        dpkg-scanpackages . /dev/null > Packages
+        gzip -9fk Packages
+        apt-ftparchive release . > Release
+        gpg --batch --yes --armor --detach-sign --local-user "$GPG_KEY_ID" Release
+        mv Release.asc Release.gpg
+
+    - name: Push APT repo to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v6
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./
+        publish_branch: gh-pages
