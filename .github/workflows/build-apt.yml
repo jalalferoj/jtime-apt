@@ -1,4 +1,4 @@
-name: Auto-version and Update APT Repo
+name: Multi-Arch APT Repository
 
 on:
   push:
@@ -6,16 +6,21 @@ on:
       - main
 
 jobs:
-  apt:
+  build:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install tools
+    - name: Install build tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y dpkg-dev apt-utils gnupg
+        sudo apt-get install -y \
+          build-essential \
+          ncurses-dev \
+          dpkg-dev \
+          apt-utils \
+          gnupg
 
     - name: Import GPG key
       uses: crazy-max/ghaction-import-gpg@v6
@@ -23,12 +28,31 @@ jobs:
         gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
         passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-    - name: Auto bump version
+    - name: Build jtime (amd64)
       run: |
-        chmod +x bump-version.sh
-        ./bump-version.sh
+        make clean || true
+        make
+        mkdir -p pkg/usr/local/bin
+        cp jtime pkg/usr/local/bin/
 
-    - name: Generate Packages
+    - name: Create amd64 .deb
+      run: |
+        mkdir -p pkg/DEBIAN
+        cat <<EOF > pkg/DEBIAN/control
+Package: jtime
+Version: 1.0-$(date +%s)
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libc6, libncurses6
+Maintainer: Jalal Feroj
+Description: Terminal clock with weather display
+EOF
+
+        dpkg-deb --build pkg
+        mv pkg.deb jtime_amd64.deb
+
+    - name: Generate Packages index
       run: |
         dpkg-scanpackages . /dev/null > Packages
         gzip -9f Packages
@@ -42,11 +66,11 @@ jobs:
         gpg --batch --yes --armor --detach-sign Release
         mv Release.asc Release.gpg
 
-    - name: Commit changes
+    - name: Commit and push
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
         git add *.deb Packages Packages.gz Release Release.gpg
-        git commit -m "Auto bump jtime version" || echo "No changes"
+        git commit -m "Add amd64 build and update APT metadata" || echo "No changes"
         git push
 
