@@ -37,10 +37,7 @@
              apt-ftparchive release . > Release                                                                         
                                                                                                                         
          - name: Sign Release                                                                                           
-           run: |                                                                                                       
-             gpg --batch --yes --pinentry-mode loopback \                                                               
-               --passphrase "${{ secrets.GPG_PASSPHRASE }}" \                                                           
-               --armor --detach-sign --output Release.gpg Release                                                       
+           run: gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --armor --detach-sign --output Release.gpg Release                                                      
                                                                                                                         
          - name: Commit and push                                                                                        
            run: |                                                                                                       
