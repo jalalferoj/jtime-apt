@@ -26,11 +26,10 @@
            with:                                                                                                        
              gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}                                                            
              base64_encoded: true                                                                                       
+             passphrase: ${{ secrets.GPG_PASSPHRASE }}                                                                  
                                                                                                                         
-         - name: Generate Packages index                                                                                
-           run: |                                                                                                       
-             dpkg-scanpackages --multiversion . > Packages                                                              
-             gzip -9c Packages > Packages.gz                                                                            
+         - name: Sign Release                                                                                           
+           run: gpg --batch --yes --armor --detach-sign --output Release.gpg Release                                                                           
                                                                                                                         
          - name: Generate Release                                                                                       
            run: |                                                                                                       
