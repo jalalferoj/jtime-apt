@@ -1,75 +1,51 @@
-name: Multi-Arch APT Repository
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Install build tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libncurses-dev dpkg-dev apt-utils gnupg
-
-    - name: Import GPG key
-      id: import_gpg
-      uses: crazy-max/ghaction-import-gpg@v6
-      with:
-        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        base64_encoded: true
-        
-
-    - name: Build jtime (amd64)
-      run: |
-        make clean || true
-        make
-        mkdir -p pkg/usr/local/bin
-        cp jtime pkg/usr/local/bin/
-
-    - name: Create amd64 .deb
-      run: |
-        mkdir -p pkg/DEBIAN
-        cat > pkg/DEBIAN/control <<'EOF'
-Package: jtime
-Version: 1.0-1
-Section: utils
-Priority: optional
-Architecture: amd64
-Depends: libc6, libncurses6
-Maintainer: Jalal Feroj
-Description: Terminal clock with weather display
-EOF
-        dpkg-deb --build pkg
-        mv pkg.deb jtime_1.0-1_amd64.deb
-
-    - name: Generate Packages index
-      run: |
-        dpkg-scanpackages . /dev/null > Packages
-        gzip -9c Packages > Packages.gz
-
-    - name: Generate Release
-      run: |
-        apt-ftparchive release . > Release
-
-    - name: Sign Release
-      run: |
-        # Use loopback mode to ensure the passphrase is read from the environment
-        echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --armor --detach-sign --output Release.gpg Release
-
-    - name: Commit and push
-      run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        git add *.deb Packages Packages.gz Release Release.gpg
-        git commit -m "Add amd64 build and update APT metadata" || echo "No changes"
-        git push
-
+   name: Update APT Repository                                                                                          
+                                                                                                                        
+   on:                                                                                                                  
+     push:                                                                                                              
+       branches:                                                                                                        
+         - main                                                                                                         
+     workflow_dispatch:                                                                                                 
+                                                                                                                        
+   jobs:                                                                                                                
+     update-apt:                                                                                                        
+       runs-on: ubuntu-latest                                                                                           
+                                                                                                                        
+       steps:                                                                                                           
+         - name: Checkout                                                                                               
+           uses: actions/checkout@v4                                                                                    
+           with:                                                                                                        
+             fetch-depth: 0                                                                                             
+                                                                                                                        
+         - name: Install tools                                                                                          
+           run: |                                                                                                       
+             sudo apt-get update                                                                                        
+             sudo apt-get install -y dpkg-dev apt-utils gnupg                                                           
+                                                                                                                        
+         - name: Import GPG key                                                                                         
+           uses: crazy-max/ghaction-import-gpg@v6                                                                       
+           with:                                                                                                        
+             gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}                                                            
+             base64_encoded: true                                                                                       
+                                                                                                                        
+         - name: Generate Packages index                                                                                
+           run: |                                                                                                       
+             dpkg-scanpackages --multiversion . > Packages                                                              
+             gzip -9c Packages > Packages.gz                                                                            
+                                                                                                                        
+         - name: Generate Release                                                                                       
+           run: |                                                                                                       
+             apt-ftparchive release . > Release                                                                         
+                                                                                                                        
+         - name: Sign Release                                                                                           
+           run: |                                                                                                       
+             gpg --batch --yes --pinentry-mode loopback \                                                               
+               --passphrase "${{ secrets.GPG_PASSPHRASE }}" \                                                           
+               --armor --detach-sign --output Release.gpg Release                                                       
+                                                                                                                        
+         - name: Commit and push                                                                                        
+           run: |                                                                                                       
+             git config user.name "github-actions"                                                                      
+             git config user.email "github-actions@github.com"                                                          
+             git add Packages Packages.gz Release Release.gpg                                                           
+             git commit -m "Update APT repository metadata" || echo "No changes"                                        
+             git push  
