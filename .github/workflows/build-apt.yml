@@ -5,10 +5,12 @@
        branches:                                                                                                        
          - main                                                                                                         
      workflow_dispatch:                                                                                                 
-                                                                                                                        
+                                               
    jobs:                                                                                                                
      update-apt:                                                                                                        
-       runs-on: ubuntu-latest                                                                                           
+       runs-on: ubuntu-latest
+       permissions:                                                                                                     
+         contents: write   
                                                                                                                         
        steps:                                                                                                           
          - name: Checkout                                                                                               
